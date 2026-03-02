@@ -1,0 +1,105 @@
+---
+title: Déployer sur Railway
+x-i18n:
+  generated_at: "2026-02-25T12:00:00Z"
+  model: claude-opus-4-6
+  provider: claude-code
+  source_path: docs/install/railway.mdx
+  workflow: manual
+---
+
+Déployez OpenClaw sur Railway avec un modèle en un clic et terminez la configuration dans votre navigateur.
+C'est le chemin le plus simple « sans terminal sur le serveur » : Railway exécute le Gateway pour vous,
+et vous configurez tout via l'assistant web `/setup`.
+
+## Liste de contrôle rapide (nouveaux utilisateurs)
+
+1. Cliquez sur **Deploy on Railway** (ci-dessous).
+2. Ajoutez un **Volume** monté sur `/data`.
+3. Définissez les **Variables** requises (au minimum `SETUP_PASSWORD`).
+4. Activez le **HTTP Proxy** sur le port `8080`.
+5. Ouvrez `https://<votre-domaine-railway>/setup` et terminez l'assistant.
+
+## Déploiement en un clic
+
+<a href="https://railway.com/deploy/clawdbot-railway-template" target="_blank" rel="noreferrer">
+  Deploy on Railway
+</a>
+
+Après le déploiement, trouvez votre URL publique dans **Railway -> votre service -> Settings -> Domains**.
+
+Railway va soit :
+
+- vous donner un domaine généré (souvent `https://<quelque-chose>.up.railway.app`), soit
+- utiliser votre domaine personnalisé si vous en avez attaché un.
+
+Puis ouvrez :
+
+- `https://<votre-domaine-railway>/setup` : assistant de configuration (protégé par mot de passe)
+- `https://<votre-domaine-railway>/openclaw` : interface de contrôle
+
+## Ce que vous obtenez
+
+- Gateway OpenClaw hébergé + interface de contrôle
+- Assistant de configuration web à `/setup` (aucune commande terminal)
+- Stockage persistant via Railway Volume (`/data`) pour que la configuration/les identifiants/l'espace de travail survivent aux redéploiements
+- Export de sauvegarde à `/setup/export` pour migrer hors de Railway plus tard
+
+## Paramètres Railway requis
+
+### Réseau public
+
+Activez le **HTTP Proxy** pour le service.
+
+- Port : `8080`
+
+### Volume (requis)
+
+Attachez un volume monté sur :
+
+- `/data`
+
+### Variables
+
+Définissez ces variables sur le service :
+
+- `SETUP_PASSWORD` (requis)
+- `PORT=8080` (requis : doit correspondre au port dans Public Networking)
+- `OPENCLAW_STATE_DIR=/data/.openclaw` (recommandé)
+- `OPENCLAW_WORKSPACE_DIR=/data/workspace` (recommandé)
+- `OPENCLAW_GATEWAY_TOKEN` (recommandé ; traitez comme un secret administrateur)
+
+## Flux de configuration
+
+1. Visitez `https://<votre-domaine-railway>/setup` et entrez votre `SETUP_PASSWORD`.
+2. Choisissez un fournisseur de modèle/authentification et collez votre clé.
+3. (Optionnel) Ajoutez les jetons Telegram/Discord/Slack.
+4. Cliquez sur **Run setup**.
+
+Si les DM Telegram sont configurés en appairage, l'assistant de configuration peut approuver le code d'appairage.
+
+## Obtenir les jetons de chat
+
+### Jeton de bot Telegram
+
+1. Envoyez un message à `@BotFather` dans Telegram
+2. Exécutez `/newbot`
+3. Copiez le jeton (ressemble à `123456789:AA...`)
+4. Collez-le dans `/setup`
+
+### Jeton de bot Discord
+
+1. Allez sur [https://discord.com/developers/applications](https://discord.com/developers/applications)
+2. **New Application** -> choisissez un nom
+3. **Bot** -> **Add Bot**
+4. **Activez MESSAGE CONTENT INTENT** sous Bot -> Privileged Gateway Intents (requis, sinon le bot plantera au démarrage)
+5. Copiez le **Bot Token** et collez-le dans `/setup`
+6. Invitez le bot sur votre serveur (OAuth2 URL Generator ; scopes : `bot`, `applications.commands`)
+
+## Sauvegardes et migration
+
+Téléchargez une sauvegarde à :
+
+- `https://<votre-domaine-railway>/setup/export`
+
+Cela exporte votre état OpenClaw + espace de travail pour que vous puissiez migrer vers un autre hôte sans perdre la configuration ou la mémoire.
