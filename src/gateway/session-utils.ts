@@ -38,7 +38,7 @@ import {
   resolveAvatarMime,
 } from "../shared/avatar-policy.js";
 import { normalizeSessionDeliveryFields } from "../utils/delivery-context.js";
-import { readSessionTitleFieldsFromTranscript } from "./session-utils.fs.js";
+import { readSessionTitleFieldsFromTranscriptAsync } from "./session-utils.fs.js";
 import type {
   GatewayAgentRow,
   GatewaySessionRow,
@@ -52,7 +52,6 @@ export {
   capArrayByJsonBytes,
   readFirstUserMessageFromTranscript,
   readLastMessagePreviewFromTranscript,
-  readSessionTitleFieldsFromTranscript,
   readSessionPreviewItemsFromTranscript,
   readSessionMessages,
   resolveSessionTranscriptCandidates,
@@ -715,12 +714,12 @@ export function resolveSessionModelIdentityRef(
   return { provider: resolved.provider, model: resolved.model };
 }
 
-export function listSessionsFromStore(params: {
+export async function listSessionsFromStore(params: {
   cfg: OpenClawConfig;
   storePath: string;
   store: Record<string, SessionEntry>;
   opts: import("./protocol/index.js").SessionsListParams;
-}): SessionsListResult {
+}): Promise<SessionsListResult> {
   const { cfg, storePath, store, opts } = params;
   const now = Date.now();
 
@@ -862,31 +861,33 @@ export function listSessionsFromStore(params: {
     sessions = sessions.slice(0, limit);
   }
 
-  const finalSessions: GatewaySessionRow[] = sessions.map((s) => {
-    const { entry, ...rest } = s;
-    let derivedTitle: string | undefined;
-    let lastMessagePreview: string | undefined;
-    if (entry?.sessionId) {
-      if (includeDerivedTitles || includeLastMessage) {
-        const parsed = parseAgentSessionKey(s.key);
-        const agentId =
-          parsed && parsed.agentId ? normalizeAgentId(parsed.agentId) : resolveDefaultAgentId(cfg);
-        const fields = readSessionTitleFieldsFromTranscript(
-          entry.sessionId,
-          storePath,
-          entry.sessionFile,
-          agentId,
-        );
-        if (includeDerivedTitles) {
-          derivedTitle = deriveSessionTitle(entry, fields.firstUserMessage);
-        }
-        if (includeLastMessage && fields.lastMessagePreview) {
-          lastMessagePreview = fields.lastMessagePreview;
+  const finalSessions: GatewaySessionRow[] = await Promise.all(
+    sessions.map(async (s) => {
+      const { entry, ...rest } = s;
+      let derivedTitle: string | undefined;
+      let lastMessagePreview: string | undefined;
+      if (entry?.sessionId) {
+        if (includeDerivedTitles || includeLastMessage) {
+          const parsed = parseAgentSessionKey(s.key);
+          const agentId =
+            parsed && parsed.agentId ? normalizeAgentId(parsed.agentId) : resolveDefaultAgentId(cfg);
+          const fields = await readSessionTitleFieldsFromTranscriptAsync(
+            entry.sessionId,
+            storePath,
+            entry.sessionFile,
+            agentId,
+          );
+          if (includeDerivedTitles) {
+            derivedTitle = deriveSessionTitle(entry, fields.firstUserMessage);
+          }
+          if (includeLastMessage && fields.lastMessagePreview) {
+            lastMessagePreview = fields.lastMessagePreview;
+          }
         }
       }
-    }
-    return { ...rest, derivedTitle, lastMessagePreview } satisfies GatewaySessionRow;
-  });
+      return { ...rest, derivedTitle, lastMessagePreview } satisfies GatewaySessionRow;
+    }),
+  );
 
   return {
     ts: now,
