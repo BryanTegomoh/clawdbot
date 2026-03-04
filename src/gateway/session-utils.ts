@@ -67,6 +67,7 @@ export type {
 } from "./session-utils.types.js";
 
 const DERIVED_TITLE_MAX_LEN = 60;
+const TRANSCRIPT_READ_CONCURRENCY = 8;
 
 function tryResolveExistingPath(value: string): string | null {
   try {
@@ -714,6 +715,31 @@ export function resolveSessionModelIdentityRef(
   return { provider: resolved.provider, model: resolved.model };
 }
 
+async function mapWithConcurrency<T, R>(
+  items: readonly T[],
+  concurrency: number,
+  mapper: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  if (items.length === 0) {
+    return [];
+  }
+  const workers = Math.min(items.length, Math.max(1, Math.floor(concurrency)));
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  async function runWorker() {
+    while (true) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      if (currentIndex >= items.length) {
+        return;
+      }
+      results[currentIndex] = await mapper(items[currentIndex], currentIndex);
+    }
+  }
+  await Promise.all(Array.from({ length: workers }, () => runWorker()));
+  return results;
+}
+
 export async function listSessionsFromStore(params: {
   cfg: OpenClawConfig;
   storePath: string;
@@ -861,8 +887,10 @@ export async function listSessionsFromStore(params: {
     sessions = sessions.slice(0, limit);
   }
 
-  const finalSessions: GatewaySessionRow[] = await Promise.all(
-    sessions.map(async (s) => {
+  const finalSessions: GatewaySessionRow[] = await mapWithConcurrency(
+    sessions,
+    TRANSCRIPT_READ_CONCURRENCY,
+    async (s) => {
       const { entry, ...rest } = s;
       let derivedTitle: string | undefined;
       let lastMessagePreview: string | undefined;
@@ -886,7 +914,7 @@ export async function listSessionsFromStore(params: {
         }
       }
       return { ...rest, derivedTitle, lastMessagePreview } satisfies GatewaySessionRow;
-    }),
+    },
   );
 
   return {
