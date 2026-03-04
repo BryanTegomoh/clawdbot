@@ -156,7 +156,7 @@ export const nostrPlugin: ChannelPlugin<ResolvedNostrAccount> = {
         messageId: `nostr-${Date.now()}`,
       };
     },
-    sendMedia: async ({ to, text, mediaUrl, accountId }) => {
+    sendMedia: async ({ cfg, to, text, mediaUrl, accountId }) => {
       // Nostr has no native media support; append the URL after the caption text.
       const core = getNostrRuntime();
       const aid = accountId ?? DEFAULT_ACCOUNT_ID;
@@ -165,7 +165,7 @@ export const nostrPlugin: ChannelPlugin<ResolvedNostrAccount> = {
         throw new Error(`Nostr bus not running for account ${aid}`);
       }
       const tableMode = core.channel.text.resolveMarkdownTableMode({
-        cfg: core.config.loadConfig(),
+        cfg,
         channel: "nostr",
         accountId: aid,
       });
