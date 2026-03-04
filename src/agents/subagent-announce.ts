@@ -741,6 +741,10 @@ async function sendSubagentAnnounceDirectly(params: {
   completionDirectOrigin?: DeliveryContext;
   directOrigin?: DeliveryContext;
   requesterIsSubagent: boolean;
+  /** When true, skip the pendingDescendantRuns coordination guard. Used for
+   * cron-job completions whose standalone delivery must not be blocked by
+   * sibling/descendant run counts. */
+  skipPendingDescendantGuard?: boolean;
   signal?: AbortSignal;
 }): Promise<SubagentAnnounceDeliveryResult> {
   if (params.signal?.aborted) {
@@ -803,7 +807,9 @@ async function sendSubagentAnnounceDirectly(params: {
         }
         // Keep non-bound completion announcements coordinated via requester
         // session routing while sibling or descendant runs are still pending.
-        if (pendingDescendantRuns > 0) {
+        // Cron-job completions are standalone channel sends and must not be
+        // blocked by descendant counts from other sessions in the tree.
+        if (pendingDescendantRuns > 0 && !params.skipPendingDescendantGuard) {
           shouldSendCompletionDirectly = false;
         }
       }
@@ -921,6 +927,7 @@ async function deliverSubagentAnnouncement(params: {
   spawnMode?: SpawnSubagentMode;
   directIdempotencyKey: string;
   currentRunId?: string;
+  skipPendingDescendantGuard?: boolean;
   signal?: AbortSignal;
 }): Promise<SubagentAnnounceDeliveryResult> {
   return await runSubagentAnnounceDispatch({
@@ -951,6 +958,7 @@ async function deliverSubagentAnnouncement(params: {
         directOrigin: params.directOrigin,
         requesterIsSubagent: params.requesterIsSubagent,
         expectsCompletionMessage: params.expectsCompletionMessage,
+        skipPendingDescendantGuard: params.skipPendingDescendantGuard,
         signal: params.signal,
         bestEffortDeliver: params.bestEffortDeliver,
       }),
@@ -1408,6 +1416,9 @@ export async function runSubagentAnnounceFlow(params: {
       spawnMode: params.spawnMode,
       directIdempotencyKey,
       currentRunId: params.childRunId,
+      // Cron completions are standalone channel sends and must not be held back
+      // by sibling descendant run counts from other sessions in the tree.
+      skipPendingDescendantGuard: announceType === "cron job",
       signal: params.signal,
     });
     // Cron delivery state should only be marked as delivered when we have a
