@@ -321,14 +321,14 @@ describe("node subscription manager", () => {
           entry: { spawnedBy: "agent:parent:main" },
           cfg: {} as never,
           storePath: undefined,
-        } as ReturnType<typeof sessionUtils.loadSessionEntry>;
+        } as unknown as ReturnType<typeof sessionUtils.loadSessionEntry>;
       }
       return {
         canonicalKey: key,
         entry: undefined,
         cfg: {} as never,
         storePath: undefined,
-      } as ReturnType<typeof sessionUtils.loadSessionEntry>;
+      } as unknown as ReturnType<typeof sessionUtils.loadSessionEntry>;
     });
 
     manager.subscribe("node-a", "agent:parent:main");
