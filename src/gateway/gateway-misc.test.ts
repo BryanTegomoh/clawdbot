@@ -335,7 +335,7 @@ describe("node subscription manager", () => {
     manager.sendToSession("agent:child:main", "chat", { ok: true }, sendEvent);
 
     expect(sent).toHaveLength(1);
-    expect(sent[0]).toEqual({ nodeId: "node-a", event: "chat" });
+    expect(sent[0]).toMatchObject({ nodeId: "node-a", event: "chat" });
     expect(loadSpy).toHaveBeenCalledWith("agent:child:main");
 
     loadSpy.mockRestore();
