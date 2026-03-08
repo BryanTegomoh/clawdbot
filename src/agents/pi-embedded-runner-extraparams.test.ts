@@ -1387,7 +1387,7 @@ describe("applyExtraParamsToAgent", () => {
     expect(payload.store).toBe(false);
   });
 
-  it("does not force store for models that declare supportsStore=false", () => {
+  it("strips store entirely for models that declare supportsStore=false (#39086)", () => {
     const payload = runResponsesPayloadMutationCase({
       applyProvider: "azure-openai-responses",
       applyModelId: "gpt-4o",
@@ -1405,7 +1405,10 @@ describe("applyExtraParamsToAgent", () => {
         compat: { supportsStore: false },
       } as unknown as Model<"openai-responses">,
     });
-    expect(payload.store).toBe(false);
+    // Strict OpenAI-compatible endpoints (Gemini, Cloudflare AI Gateway) reject
+    // unknown fields. When supportsStore=false, the pi-ai SDK injects store=false;
+    // the wrapper must strip it entirely rather than leaving it in the payload.
+    expect(payload).not.toHaveProperty("store");
   });
 
   it("auto-injects OpenAI Responses context_management compaction for direct OpenAI models", () => {

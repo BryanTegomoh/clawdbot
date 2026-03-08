@@ -305,7 +305,13 @@ function createOpenAIResponsesContextManagementWrapper(
   return (model, context, options) => {
     const forceStore = shouldForceResponsesStore(model);
     const useServerCompaction = shouldEnableOpenAIResponsesServerCompaction(model, extraParams);
-    if (!forceStore && !useServerCompaction) {
+    // Strip `store` from payload when model explicitly declares it is not supported
+    // (e.g. Gemini via OpenAI-compatible relay, Azure without server-side persistence).
+    // The pi-ai SDK injects store=false on Responses API paths; strict endpoints
+    // reject unknown fields, so we must remove it entirely.
+    const stripStore =
+      (model as { compat?: { supportsStore?: boolean } }).compat?.supportsStore === false;
+    if (!forceStore && !useServerCompaction && !stripStore) {
       return underlying(model, context, options);
     }
 
@@ -320,6 +326,8 @@ function createOpenAIResponsesContextManagementWrapper(
           const payloadObj = payload as Record<string, unknown>;
           if (forceStore) {
             payloadObj.store = true;
+          } else if (stripStore && "store" in payloadObj) {
+            delete payloadObj.store;
           }
           if (useServerCompaction && payloadObj.context_management === undefined) {
             payloadObj.context_management = [
